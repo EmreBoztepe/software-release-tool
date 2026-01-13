@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 import traceback
 from a2l.main_a2l import build_symbol_map, process_a2l
 from elftools.elf.elffile import ELFFile
-import t32
+from t32 import t32
 from vision import ati_vision
 import os
 
@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 class UiConfig:
     a2l_path: str = ""
     s19_path: str = ""
+    boot_path: str = ""
     elf_path: str = ""
     addressed_a2l_path: str = ""
     output_dir: str = ""
@@ -97,16 +98,18 @@ class Trace32Worker(QObject):
     finished = Signal()
     failed = Signal(str)
 
-    def __init__(self, elf_path: str):
+    def __init__(self, elf_path: str, boot_path: str):
         super().__init__()
         self.elf_path = elf_path
+        self.boot_path = boot_path
 
     def run(self):
         try:
             self.status.emit("TRACE32 flashing started")
+            self.log.emit(f"TRACE32: flashing BOOT -> {self.boot_path}")
             self.log.emit(f"TRACE32: flashing ELF -> {self.elf_path}")
 
-            t32.run_flash(self.elf_path)
+            t32.run_flash(self.elf_path, self.boot_path)
 
             self.status.emit("TRACE32 flashing done")
             self.finished.emit()
@@ -155,7 +158,7 @@ class MainWindow(QMainWindow):
         root = QWidget()  
         # Ana pencerenin içeriğini taşıyacak boş bir container (widget) oluşturulur.
 
-        self.setCentralWidget(root)  
+        self.setCentralWidget(root)
         # QMainWindow tek bir central widget kabul eder.
         # Butonlar, textbox'lar ve tüm ana içerik bu widget'ın içinde yer alır.
 
@@ -163,11 +166,14 @@ class MainWindow(QMainWindow):
         self.a2l_edit = QLineEdit()
         self.a2l_btn = QPushButton("Browse...")
         self.a2l_btn.clicked.connect(lambda: self._pick_file(self.a2l_edit, "A2L Files (*.a2l);;All Files (*.*)"))
-        
 
         self.s19_edit = QLineEdit()
         self.s19_btn = QPushButton("Browse...")
         self.s19_btn.clicked.connect(lambda: self._pick_file(self.s19_edit, "S-Record Files (*.s19);;All Files (*.*)"))
+
+        self.boot_edit = QLineEdit()
+        self.boot_btn = QPushButton("Browse...")
+        self.boot_btn.clicked.connect(lambda: self._pick_file(self.boot_edit, "S-Record Files (*.s19);;All Files (*.*)"))
 
         self.elf_edit = QLineEdit()
         self.elf_btn = QPushButton("Browse...")
@@ -182,6 +188,8 @@ class MainWindow(QMainWindow):
         self.project_combo = QComboBox()
         self.project_combo.addItem("project1")
         self.project_combo.addItem("project2")
+        self.project_combo.addItem("project3")
+        self.project_combo.addItem("project4")
 
         input_group = QGroupBox("Inputs")
         input_layout = QGridLayout()
@@ -195,9 +203,13 @@ class MainWindow(QMainWindow):
         input_layout.addWidget(self.s19_edit, 1, 1)
         input_layout.addWidget(self.s19_btn, 1, 2)
 
-        input_layout.addWidget(QLabel("ELF Path:"), 2, 0)
-        input_layout.addWidget(self.elf_edit, 2, 1)
-        input_layout.addWidget(self.elf_btn, 2, 2)
+        input_layout.addWidget(QLabel("Boot Path"), 2, 0)
+        input_layout.addWidget(self.boot_edit, 2, 1)
+        input_layout.addWidget(self.boot_btn, 2, 2)
+
+        input_layout.addWidget(QLabel("ELF Path:"), 3, 0)
+        input_layout.addWidget(self.elf_edit, 3, 1)
+        input_layout.addWidget(self.elf_btn, 3, 2)
 
         input_layout.addWidget(QLabel("Output Dir:"), 4, 0)
         input_layout.addWidget(self.out_edit, 4, 1)
@@ -206,7 +218,7 @@ class MainWindow(QMainWindow):
         input_layout.addWidget(QLabel("Svn Number:"), 5, 0)
         input_layout.addWidget(self.svn_num, 5, 1)
         
-        input_layout.addWidget(QLabel("Proje Seç"),10 , 0)
+        input_layout.addWidget(QLabel("Select Project"),10 , 0)
         input_layout.addWidget(self.project_combo,10,1)
 
         opts_row = QHBoxLayout()
@@ -273,7 +285,7 @@ class MainWindow(QMainWindow):
 
         # Son ayarları yükle
         self._restore_settings()
-        self._log_info("GUI hazır. Dosyaları seçip Run'a basabilirsin.")
+        self._log_info("GUI is ready. Pick the files and click to Run button.")
 
     # -------------------------
     # UI helpers
@@ -355,7 +367,7 @@ class MainWindow(QMainWindow):
         self.selected_project = self.project_combo.currentText()
         svn_number =  int(self.svn_num.text())
         self._log_info(f"Svn number:,{svn_number}")
-        self._log_info("Run clicked -> A2L addressing başlatılıyor.")
+        self._log_info("Run clicked -> A2L addressing is starting...")
         self._log_info(f"A2L: {cfg.a2l_path}")
         self._log_info(f"ELF: {cfg.elf_path}")
         self._log_info(f"Output Dir: {cfg.output_dir}")
@@ -404,6 +416,7 @@ class MainWindow(QMainWindow):
         return UiConfig(
             a2l_path=self.a2l_edit.text().strip(),
             s19_path=self.s19_edit.text().strip(),
+            boot_path=self.boot_edit.text().strip(),
             elf_path=self.elf_edit.text().strip(),
             output_dir=self.out_edit.text().strip(),
         )
@@ -498,13 +511,13 @@ class MainWindow(QMainWindow):
 
         self.vision_thread.start()
 
-    def _start_trace32_flash(self, elf_path: str):
+    def _start_trace32_flash(self, elf_path: str, boot_path: str):
         self.run_btn.setEnabled(False)
         self.progress.setValue(0)
         self._set_status("Starting TRACE32 flash...")
 
         self.t32_thread = QThread(self)
-        self.t32_worker = Trace32Worker(elf_path)
+        self.t32_worker = Trace32Worker(elf_path, boot_path)
         self.t32_worker.moveToThread(self.t32_thread)
 
         # thread → worker
@@ -536,7 +549,7 @@ class MainWindow(QMainWindow):
         self._pending_cfg = cfg
 
         # Trace32’ye geç
-        self._start_trace32_flash(cfg.elf_path)
+        self._start_trace32_flash(cfg.elf_path, cfg.boot_path)
 
 
     def _on_a2l_failed(self, err: str) -> None:

@@ -36,7 +36,7 @@ PRINT "ELF selected: &ELF"
 DO ~~/demo/powerpc/flash/mpc5xxx.cmm PREPAREONLY
 FLASH.ReProgram ALL /Erase
 
-Data.LOAD.S2record &path\MPC5777C_Bootloader_1.0.0.s19
+;Data.LOAD.S2record &path\MPC5777C_Bootloader_1.0.0.s19
 
 DATA.LOAD.ELF "&ELF"
 DATA.LOAD.ELF "&ELF" /NOCODE /MACRO

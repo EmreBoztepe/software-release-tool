@@ -145,7 +145,7 @@ def connect_via_legacy_api(rcl_mode, port, packlen, timeout_s=API_TIMEOUT_SEC):
         time.sleep(0.5)
 
 
-def run_flash(elf_path: str):
+def run_flash(elf_path: str, boot_path: str):
  # 1) config.t32'yi oku
     rcl_mode, port, packlen = read_config(CONFIG_PATH)
     print(f"config.t32 -> RCL={rcl_mode} PORT={port}"
@@ -167,6 +167,7 @@ def run_flash(elf_path: str):
         raise RuntimeError("T32_Cmd hata: Remote API iletişim sorunu")
 
     elf_path = os.path.abspath(elf_path)
+    boot_path = os.path.abspath(boot_path)
 
     cmd = f'DO "{STARTUP_CMM}" "{elf_path}"'
     rc = t32.T32_Cmd(cmd.encode("utf-8"))
