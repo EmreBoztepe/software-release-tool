@@ -1,0 +1,56 @@
+intercom.name core0	
+&core0=""
+&core0 Title "TRACE32 - ECU Software"
+&core0 SYStem.RESet
+&core0 SYNCH.RESet			
+&path=OS.PPD()					
+&core0 print "Path:[&path]"
+&core0 SYStem.BdmClock 3.MHz
+SYStem.CPU MPC5777C
+SYStem.DETECT CPU
+&cpu=CPU()              
+&core0 SYStem.CPU &cpu
+&core0 SYStem.Option.WATCHDOG OFF
+&core0 SYStem.Config.Core 1.
+&core0 SYStem.Up
+Break.SELect.Program Onchip
+SYS.CpuAccess.E
+	
+; ==============================
+; ELF parameter handling (DO startup.cmm <elf_path>)
+; ==============================
+
+LOCAL &ELF
+ENTRY &ELF
+
+IF ("&ELF"=="")
+(
+    PRINT "ERROR: ELF path not provided. Usage: DO startup.cmm <elf_path>"
+    ENDDO
+)
+
+PRINT "ELF selected: &ELF"
+
+
+
+DO ~~/demo/powerpc/flash/mpc5xxx.cmm PREPAREONLY
+FLASH.ReProgram ALL /Erase
+
+Data.LOAD.S2record &path\MPC5777C_Bootloader_1.0.0.s19
+
+DATA.LOAD.ELF "&ELF"
+DATA.LOAD.ELF "&ELF" /NOCODE /MACRO
+
+FLASH.Program ALL
+
+FLASH.ReProgram OFF
+PRINT "File loaded"
+
+
+	&core0 WinPOS 0.625 0.42857 80. 23. 13. 1. W000
+	&core0 WinTABS 10. 10. 25.
+	&core0 List.auto
+
+SYStem.Up
+
+ENDDO

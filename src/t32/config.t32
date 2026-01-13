@@ -1,0 +1,19 @@
+
+
+; Environment variables
+OS=
+ID=T32
+SYS=D:\T32
+
+
+
+; USB information 
+PBI=
+USB
+
+; Printer settings 
+PRINTER=WINDOWS
+
+RCL=NETASSIST
+PACKLEN=1024
+PORT=20000    
