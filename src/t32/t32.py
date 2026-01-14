@@ -169,14 +169,17 @@ def run_flash(elf_path: str, boot_path: str):
     elf_path = os.path.abspath(elf_path)
     boot_path = os.path.abspath(boot_path)
 
-    t32.T32_Cmd(f'&ELF="{elf_path}"'.encode("utf-8"))
-    t32.T32_Cmd(f'&BOOT="{boot_path}"'.encode("utf-8"))
-    t32.T32_Cmd(f'DO "{STARTUP_CMM}"'.encode("utf-8"))
-
-    rc = 5
+    rc = t32.T32_Cmd(f'&ELF="{elf_path}"'.encode("utf-8"))
     if rc < 0:
-        raise RuntimeError("T32_Cmd comm error while starting CMM")
+        raise RuntimeError("T32_Cmd failed while setting &ELF")
 
+    rc = t32.T32_Cmd(f'&BOOT="{boot_path}"'.encode("utf-8"))
+    if rc < 0:
+        raise RuntimeError("T32_Cmd failed while setting &BOOT")
+
+    rc = t32.T32_Cmd(f'DO "{STARTUP_CMM}"'.encode("utf-8"))
+    if rc < 0:
+        raise RuntimeError("T32_Cmd failed while starting startup.cmm")
     
     state = ctypes.c_int(-1)
     timeout_s = 600.0
