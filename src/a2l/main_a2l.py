@@ -149,13 +149,63 @@ def resolve_struct_member_addr(elf: ELFFile, dwarfinfo, symmap: dict, dotted_nam
     note += f"+DWARF({mem_off})"
     return final_addr, note
 
+SEG_RE = re.compile(
+    r'^(?P<prefix>\s*)(?P<seg>[A-Za-z0-9_]+)\s+@REG_START@\s+@REG_SIZE@(?P<suffix>.*)$'
+)
+
+def get_section_addr_size(elf: ELFFile, section_name_candidates: list[str]):
+    """
+    Verilen candidate isimlerden ELF içinde section bulur, (addr, size, used_name) döner.
+    """
+    for nm in section_name_candidates:
+        sec = elf.get_section_by_name(nm)
+        if sec is not None:
+            return int(sec["sh_addr"]), int(sec["sh_size"]), nm
+    return None
+
+def fill_reg_placeholders_in_line(ln: str, elf: ELFFile, seg_to_sections: dict[str, list[str]]):
+    """
+    'CAL_SEG_RAM @REG_START@ @REG_SIZE@ ...' gibi satırlarda placeholder doldurur.
+    Satır değiştiyse (new_line, note) döner; değişmediyse None döner.
+    """
+    m = SEG_RE.match(ln)
+    if not m:
+        return None
+
+    seg = m.group("seg")
+    candidates = seg_to_sections.get(seg)
+    if not candidates:
+        # mapping yoksa dokunma
+        return None
+
+    r = get_section_addr_size(elf, candidates)
+    if not r:
+        return None
+
+    addr, size, used = r
+
+    # A2L genelde hex bekler. Size için de hex kullanmak yaygın.
+    new_line = f"{m.group('prefix')}{seg} 0x{addr:X} 0x{size:X}{m.group('suffix')}"
+    note = f"ELF section {used}: addr=0x{addr:X}, size=0x{size:X}"
+    return new_line, note
+
 def process_a2l(a2l_in: Path, a2l_out: Path, elf: ELFFile, symmap: dict, csv_out: Path):
     lines = a2l_in.read_text(encoding="utf-8", errors="ignore").splitlines()
     dwarfinfo = elf.get_dwarf_info()
     resolved, missing, unchanged = [], [], []
     new_lines = []
+    seg_to_sections = {"CAL_SEG_RAM": [".cal_seg_ram", ".CAL_SEG_RAM", ".CAL_SEG_RAM_DATA"],}
 
     for ln in lines:
+
+        # 1) Önce segment placeholder satırları
+        rr = fill_reg_placeholders_in_line(ln, elf, seg_to_sections)
+        if rr:
+            new_ln, note = rr
+            new_lines.append(new_ln)
+            resolved.append(("CAL_SEG_RAM", "0x...", note, "SEGMENT"))  # raporlamak istersen
+            continue
+
         m = LINE_RE.match(ln)
         if not m: new_lines.append(ln); continue
         cur = m.group("addr"); pname = m.group("name").strip()
