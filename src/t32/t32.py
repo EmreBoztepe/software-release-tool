@@ -169,8 +169,11 @@ def run_flash(elf_path: str, boot_path: str):
     elf_path = os.path.abspath(elf_path)
     boot_path = os.path.abspath(boot_path)
 
-    cmd = f'DO "{STARTUP_CMM}" "{elf_path}"'
-    rc = t32.T32_Cmd(cmd.encode("utf-8"))
+    t32.T32_Cmd(f'&ELF="{elf_path}"'.encode("utf-8"))
+    t32.T32_Cmd(f'&BOOT="{boot_path}"'.encode("utf-8"))
+    t32.T32_Cmd(f'DO "{STARTUP_CMM}"'.encode("utf-8"))
+
+    rc = 5
     if rc < 0:
         raise RuntimeError("T32_Cmd comm error while starting CMM")
 

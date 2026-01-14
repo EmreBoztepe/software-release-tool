@@ -20,23 +20,16 @@ SYS.CpuAccess.E
 ; ELF parameter handling (DO startup.cmm <elf_path>)
 ; ==============================
 
-LOCAL &ELF
-ENTRY &ELF
-
-IF ("&ELF"=="")
-(
-    PRINT "ERROR: ELF path not provided. Usage: DO startup.cmm <elf_path>"
-    ENDDO
-)
+; &ELF ve &BOOT zaten set edilmiş beklenir
 
 PRINT "ELF selected: &ELF"
-
+PRINT "BOOT selected: &BOOT"
 
 
 DO ~~/demo/powerpc/flash/mpc5xxx.cmm PREPAREONLY
 FLASH.ReProgram ALL /Erase
 
-;Data.LOAD.S2record &path\MPC5777C_Bootloader_1.0.0.s19
+Data.LOAD.S2record "&BOOT"
 
 DATA.LOAD.ELF "&ELF"
 DATA.LOAD.ELF "&ELF" /NOCODE /MACRO
