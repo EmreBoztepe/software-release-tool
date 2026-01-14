@@ -9,3 +9,5 @@
 *.map
 *.bin
 *.bak
+*.cal
+*.vpj
