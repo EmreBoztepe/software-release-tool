@@ -11,3 +11,4 @@
 *.bak
 *.cal
 *.vpj
+venv/
